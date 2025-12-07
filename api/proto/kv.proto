@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package kv;
+
+option go_package = "github.com/heysubinoy/pyazdb/api/proto;proto";
+
+// KVService defines the gRPC service for key-value operations.
+service KVService {
+  // Get retrieves a value by key
+  rpc Get(GetRequest) returns (GetResponse);
+  
+  // Set stores a key-value pair
+  rpc Set(SetRequest) returns (SetResponse);
+  
+  // Delete removes a key
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+// GetRequest contains the key to retrieve
+message GetRequest {
+  string key = 1;
+}
+
+// GetResponse contains the value and whether the key was found
+message GetResponse {
+  string value = 1;
+  bool found = 2;
+}
+
+// SetRequest contains the key-value pair to store
+message SetRequest {
+  string key = 1;
+  string value = 2;
+}
+
+// SetResponse indicates success
+message SetResponse {
+  bool success = 1;
+}
+
+// DeleteRequest contains the key to delete
+message DeleteRequest {
+  string key = 1;
+}
+
+// DeleteResponse indicates success
+message DeleteResponse {
+  bool success = 1;
+}
