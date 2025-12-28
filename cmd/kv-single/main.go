@@ -5,17 +5,63 @@ import (
 	"net"
 	"net/http"
 
+	"os"
+	"path/filepath"
+
+	"github.com/hashicorp/raft"
+	raftboltdb "github.com/hashicorp/raft-boltdb"
 	"github.com/heysubinoy/pyazdb/api/proto"
 	"github.com/heysubinoy/pyazdb/internal/api"
 	"github.com/heysubinoy/pyazdb/internal/store"
 	"google.golang.org/grpc"
 )
 
-func main() {
-	// Create the in-memory store
-	memStore := store.NewMemStore()
+func setupRaft(memStore *store.MemStore) *store.RaftStore {
+	dir := "./pyaz"
+	os.MkdirAll(dir, 0700)
 
-	// Start gRPC server in a goroutine
+	config := raft.DefaultConfig()
+	config.LocalID = raft.ServerID("node1")
+
+	logStore, err := raftboltdb.NewBoltStore(filepath.Join(dir, "raft-log.bolt"))
+	if err != nil {
+		log.Fatalf("Failed to create log store: %v", err)
+	}
+	stableStore, err := raftboltdb.NewBoltStore(filepath.Join(dir, "raft-stable.bolt"))
+	if err != nil {
+		log.Fatalf("Failed to create stable store: %v", err)
+	}
+	snapshots, err := raft.NewFileSnapshotStore(dir, 1, os.Stdout)
+	if err != nil {
+		log.Fatalf("Failed to create snapshot store: %v", err)
+	}
+
+	_, inmemTransport := raft.NewInmemTransport(raft.ServerAddress("127.0.0.1:12000"))
+
+	raftStore := store.NewRaftStore(memStore, nil)
+	raftNode, _ := raft.NewRaft(config, raftStore, logStore, stableStore, snapshots, inmemTransport)
+
+	// Set the raft instance in raftStore after creation
+	// (to avoid cyclic dependency during construction)
+	raftStoreWithNode := store.NewRaftStore(memStore, raftNode)
+
+	cfg := raft.Configuration{
+		Servers: []raft.Server{
+			{
+				ID:      config.LocalID,
+				Address: inmemTransport.LocalAddr(),
+			},
+		},
+	}
+	raftNode.BootstrapCluster(cfg)
+
+	return raftStoreWithNode
+}
+
+func main() {
+	memStore := store.NewMemStore()
+	raftStore := setupRaft(memStore)
+
 	go func() {
 		grpcAddr := ":9090"
 		lis, err := net.Listen("tcp", grpcAddr)
@@ -24,7 +70,7 @@ func main() {
 		}
 
 		grpcServer := grpc.NewServer()
-		kvServer := api.NewGRPCServer(memStore)
+		kvServer := api.NewGRPCServer(raftStore)
 		proto.RegisterKVServiceServer(grpcServer, kvServer)
 
 		log.Printf("gRPC server listening on %s", grpcAddr)
@@ -33,14 +79,10 @@ func main() {
 		}
 	}()
 
-	// Create the HTTP server with the store
-	srv := api.NewServer(memStore)
-
-	// Register routes
+	srv := api.NewServer(raftStore)
 	mux := http.NewServeMux()
 	srv.RegisterRoutes(mux)
 
-	// Start the HTTP server
 	httpAddr := ":8080"
 	log.Printf("HTTP server listening on %s", httpAddr)
 
