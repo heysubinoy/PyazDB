@@ -26,6 +26,8 @@ import (
 type LeaderInfo struct {
 	ID        string    `json:"id"`
 	Addr      string    `json:"addr"`
+	HTTPAddr  string    `json:"http_addr"`
+	GRPCAddr  string    `json:"grpc_addr"`
 	Term      uint64    `json:"term"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -83,10 +85,12 @@ func setupRaft(mem *store.MemStore, nodeID, bindAddr, dataDir string, bootstrap 
 
 /* ---------------- Discovery Helpers ---------------- */
 
-func registerLeader(mandi, nodeID, addr string, r *raft.Raft) error {
+func registerLeader(mandi, nodeID, addr, httpAddr, grpcAddr string, r *raft.Raft) error {
 	info := LeaderInfo{
 		ID:        nodeID,
 		Addr:      addr,
+		HTTPAddr:  httpAddr,
+		GRPCAddr:  grpcAddr,
 		Term:      r.CurrentTerm(),
 		UpdatedAt: time.Now(),
 	}
@@ -111,13 +115,25 @@ func postJoin(mandi, nodeID, addr string) {
 
 /* ---------------- Leader Loop ---------------- */
 
-func leaderLoop(mandi, nodeID, raftAddr string, r *raft.Raft) {
-	log.Println("Waiting for leadership...")
-	for r.State() != raft.Leader {
-		time.Sleep(500 * time.Millisecond)
-	}
-	log.Println("Leader elected")
+// monitorLeadership continuously monitors if this node becomes leader
+// and runs the leader duties when it does
+func monitorLeadership(mandi, nodeID, raftAddr, httpAddr, grpcAddr string, r *raft.Raft) {
+	for {
+		// Wait until we become leader
+		for r.State() != raft.Leader {
+			time.Sleep(500 * time.Millisecond)
+		}
 
+		log.Println("Became leader, starting leader duties")
+
+		// Run leader duties until we lose leadership
+		runLeaderDuties(mandi, nodeID, raftAddr, httpAddr, grpcAddr, r)
+
+		log.Println("Lost leadership, waiting for next election")
+	}
+}
+
+func runLeaderDuties(mandi, nodeID, raftAddr, httpAddr, grpcAddr string, r *raft.Raft) {
 	leaderTicker := time.NewTicker(2 * time.Second)
 	joinTicker := time.NewTicker(3 * time.Second)
 
@@ -126,13 +142,12 @@ func leaderLoop(mandi, nodeID, raftAddr string, r *raft.Raft) {
 
 	for {
 		if r.State() != raft.Leader {
-			log.Println("Leadership lost, stopping leader loop")
 			return
 		}
 
 		select {
 		case <-leaderTicker.C:
-			_ = registerLeader(mandi, nodeID, raftAddr, r)
+			_ = registerLeader(mandi, nodeID, raftAddr, httpAddr, grpcAddr, r)
 
 		case <-joinTicker.C:
 			resp, err := http.Get(mandi + "/join-requests")
@@ -220,7 +235,10 @@ func main() {
 		log.Fatal("NODE_CONFIG not set")
 	}
 
-	cfg, _ := config.LoadConfig(cfgPath)
+	cfg, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
 	rs := setupRaft(mem, cfg.NodeID, cfg.RaftAddr, cfg.RaftData, cfg.RaftLeader)
 
@@ -229,20 +247,22 @@ func main() {
 		r = g.GetRaft()
 	}
 
-	if cfg.RaftLeader {
-		go leaderLoop(cfg.MandiAddr, cfg.NodeID, cfg.RaftAddr, r)
-	} else {
+	// Always monitor for leadership changes - any node can become leader
+	go monitorLeadership(cfg.MandiAddr, cfg.NodeID, cfg.RaftAddr, cfg.HTTPAddr, cfg.GRPCAddr, r)
+
+	// Non-leader nodes should try to join the cluster
+	if !cfg.RaftLeader {
 		go nonLeaderLoop(cfg.MandiAddr, cfg.NodeID, cfg.RaftAddr, r)
 	}
 
 	go func() {
 		lis, _ := net.Listen("tcp", cfg.GRPCAddr)
 		s := grpc.NewServer()
-		proto.RegisterKVServiceServer(s, api.NewGRPCServer(rs, r))
+		proto.RegisterKVServiceServer(s, api.NewGRPCServer(rs, r, cfg.GRPCAddr, cfg.MandiAddr))
 		s.Serve(lis)
 	}()
 
-	httpSrv := api.NewServer(rs, r)
+	httpSrv := api.NewServer(rs, r, cfg.MandiAddr, cfg.HTTPAddr)
 	mux := http.NewServeMux()
 	httpSrv.RegisterRoutes(mux)
 

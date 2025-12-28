@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -12,14 +15,64 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type LeaderInfo struct {
+	ID       string `json:"id"`
+	Addr     string `json:"addr"`
+	HTTPAddr string `json:"http_addr"`
+	GRPCAddr string `json:"grpc_addr"`
+	Term     uint64 `json:"term"`
+}
+
+func getLeaderGRPCAddr(mandiAddr string) (string, error) {
+	resp, err := http.Get(mandiAddr + "/leader")
+	if err != nil {
+		return "", fmt.Errorf("failed to query mandi: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("no leader available (status: %d)", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var leader LeaderInfo
+	if err := json.Unmarshal(body, &leader); err != nil {
+		return "", fmt.Errorf("failed to parse leader info: %w", err)
+	}
+
+	if leader.GRPCAddr == "" {
+		return "", fmt.Errorf("leader gRPC address not available")
+	}
+
+	return leader.GRPCAddr, nil
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)
 	}
 
+	// Get mandi address from environment or use default
+	mandiAddr := os.Getenv("MANDI_ADDR")
+	if mandiAddr == "" {
+		mandiAddr = "http://127.0.0.1:7000"
+	}
+
+	// Discover leader from mandi
+	leaderAddr, err := getLeaderGRPCAddr(mandiAddr)
+	if err != nil {
+		log.Fatalf("Failed to discover leader: %v", err)
+	}
+
+	fmt.Printf("Connecting to leader at %s\n", leaderAddr)
+
 	// Connect to gRPC server
-	conn, err := grpc.NewClient("localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(leaderAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
@@ -104,4 +157,7 @@ func printUsage() {
 	fmt.Println("  kv-cli get <key>")
 	fmt.Println("  kv-cli set <key> <value>")
 	fmt.Println("  kv-cli delete <key>")
+	fmt.Println("")
+	fmt.Println("Environment variables:")
+	fmt.Println("  MANDI_ADDR - Mandi discovery service address (default: http://127.0.0.1:7000)")
 }

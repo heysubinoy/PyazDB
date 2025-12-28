@@ -27,6 +27,8 @@ const (
 type LeaderInfo struct {
 	ID        string    `json:"id"`
 	Addr      string    `json:"addr"`
+	HTTPAddr  string    `json:"http_addr"`
+	GRPCAddr  string    `json:"grpc_addr"`
 	Term      uint64    `json:"term"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
