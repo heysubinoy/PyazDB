@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/hashicorp/raft"
 	"github.com/heysubinoy/pyazdb/pkg/kv"
 )
 
@@ -11,12 +12,14 @@ import (
 // The Store can be replaced with a Raft-backed implementation later.
 type Server struct {
 	Store kv.Store
+	Raft  *raft.Raft
 }
 
 // NewServer creates a new HTTP server with the given store.
-func NewServer(store kv.Store) *Server {
+func NewServer(store kv.Store, raftNode *raft.Raft) *Server {
 	return &Server{
 		Store: store,
+		Raft:  raftNode,
 	}
 }
 
@@ -32,6 +35,17 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.Raft != nil && s.Raft.State() != raft.Leader {
+		leader := s.Raft.Leader()
+		if leader == "" {
+			http.Error(w, "Not leader and no leader known", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Location", "http://"+string(leader)+":8080/get")
+		http.Error(w, "Not leader. Redirect to leader.", http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -56,6 +70,17 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.Raft != nil && s.Raft.State() != raft.Leader {
+		leader := s.Raft.Leader()
+		if leader == "" {
+			http.Error(w, "Not leader and no leader known", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Location", "http://"+string(leader)+":8080/set")
+		http.Error(w, "Not leader. Redirect to leader.", http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -87,6 +112,17 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.Raft != nil && s.Raft.State() != raft.Leader {
+		leader := s.Raft.Leader()
+		if leader == "" {
+			http.Error(w, "Not leader and no leader known", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Location", "http://"+string(leader)+":8080/delete")
+		http.Error(w, "Not leader. Redirect to leader.", http.StatusTemporaryRedirect)
 		return
 	}
 

@@ -2,9 +2,15 @@ package store
 
 import (
 	"encoding/json"
-	"github.com/hashicorp/raft"
 	"io"
+
+	"github.com/hashicorp/raft"
 )
+
+// GetRaft returns the underlying raft.Raft pointer (for API layer leader checks)
+func (rs *RaftStore) GetRaft() *raft.Raft {
+	return rs.raft
+}
 
 // RaftCommand represents a set/delete operation to be applied via Raft.
 type RaftCommand struct {
@@ -40,11 +46,12 @@ func (rs *RaftStore) Apply(log *raft.Log) interface{} {
 
 // Snapshot and Restore are required for raft.FSM, but can be no-ops for in-memory.
 func (rs *RaftStore) Snapshot() (raft.FSMSnapshot, error) { return &noopSnapshot{}, nil }
-func (rs *RaftStore) Restore(io.ReadCloser) error        { return nil }
+func (rs *RaftStore) Restore(io.ReadCloser) error         { return nil }
 
 type noopSnapshot struct{}
+
 func (n *noopSnapshot) Persist(sink raft.SnapshotSink) error { return sink.Close() }
-func (n *noopSnapshot) Release() {}
+func (n *noopSnapshot) Release()                             {}
 
 // Set submits a set command to Raft.
 func (rs *RaftStore) Set(key, value string) error {

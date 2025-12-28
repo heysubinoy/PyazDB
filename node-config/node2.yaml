@@ -1,0 +1,7 @@
+node_id: "node2"
+raft_addr: "127.0.0.1:12001"
+raft_data: "./pyaz/node2"
+raft_leader: false
+grpc_addr: ":9091"
+http_addr: ":8081"
+mandi_addr: "http://127.0.0.1:7000"

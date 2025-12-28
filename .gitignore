@@ -8,7 +8,7 @@
 *.so
 *.dylib
 
-pyaz/
+pyaz*/
 
 # Test binary, built with `go test -c`
 *.test
