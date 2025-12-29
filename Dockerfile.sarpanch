@@ -1,0 +1,22 @@
+# Dockerfile for sarpanch (cluster manager)
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -o /bin/sarpanch ./cmd/sarpanch
+
+# Final image
+FROM alpine:latest
+
+WORKDIR /app
+RUN apk --no-cache add ca-certificates
+
+COPY --from=builder /bin/sarpanch /usr/local/bin/sarpanch
+
+EXPOSE 8000
+
+CMD ["sarpanch"]

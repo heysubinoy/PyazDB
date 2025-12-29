@@ -1,0 +1,22 @@
+# Dockerfile for mandi (discovery service)
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -o /bin/mandi ./cmd/mandi
+
+# Final image
+FROM alpine:latest
+
+WORKDIR /app
+RUN apk --no-cache add ca-certificates
+
+COPY --from=builder /bin/mandi /usr/local/bin/mandi
+
+EXPOSE 7000
+
+CMD ["mandi"]

@@ -1,0 +1,24 @@
+# Dockerfile for kv-single (PyazDB node)
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -o /bin/kv-single ./cmd/kv-single
+
+# Final image
+FROM alpine:latest
+
+WORKDIR /app
+RUN apk --no-cache add ca-certificates
+
+COPY --from=builder /bin/kv-single /usr/local/bin/kv-single
+
+RUN mkdir -p /data
+
+EXPOSE 8080 9090 12000
+
+CMD ["kv-single"]

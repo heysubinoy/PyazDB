@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  mandi:
+    build:
+      context: .
+      dockerfile: Dockerfile.mandi
+    image: pyazdb-mandi:latest
+    container_name: pyazdb-mandi
+    command: mandi
+    ports:
+      - "7000:7000"
+    environment:
+      - MANDI_ADDR=:7000
+    networks:
+      - pyazdb-network
+
+  sarpanch:
+    build:
+      context: .
+      dockerfile: Dockerfile.sarpanch
+    image: pyazdb-sarpanch:latest
+    container_name: pyazdb-sarpanch
+    command: sarpanch
+    ports:
+      - "8000:8000"
+    environment:
+      - PYAZDB_IMAGE=pyazdb:latest
+      - PYAZDB_NETWORK=pyazdb-network
+      - MANDI_ADDR=http://pyazdb-mandi:7000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - mandi
+    networks:
+      - pyazdb-network
+    stdin_open: true
+    tty: true
+
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile.kv-single
+    image: pyazdb:latest
+    container_name: pyazdb-node1
+    command: kv-single
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+      - "12000:12000"
+    environment:
+      - NODE_ID=node1
+      - RAFT_ADDR=pyazdb-node1:12000
+      - RAFT_DATA=/data/node1
+      - RAFT_LEADER=true
+      - GRPC_ADDR=:9090
+      - HTTP_ADDR=:8080
+      - MANDI_ADDR=http://pyazdb-mandi:7000
+    volumes:
+      - node1-data:/data
+    depends_on:
+      - mandi
+    networks:
+      - pyazdb-network
+
+networks:
+  pyazdb-network:
+    name: pyazdb-network
+    driver: bridge
+
+volumes:
+  node1-data:

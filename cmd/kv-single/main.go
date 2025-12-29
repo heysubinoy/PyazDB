@@ -230,10 +230,8 @@ func nonLeaderLoop(mandi, nodeID, raftAddr string, r *raft.Raft) {
 func main() {
 	mem := store.NewMemStore()
 
+	// NODE_CONFIG is now optional - if not set, will use environment variables
 	cfgPath := os.Getenv("NODE_CONFIG")
-	if cfgPath == "" {
-		log.Fatal("NODE_CONFIG not set")
-	}
 
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
