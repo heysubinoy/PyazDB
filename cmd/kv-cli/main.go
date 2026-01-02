@@ -48,10 +48,14 @@ func getLeaderGRPCAddr(mandiAddr string) (string, error) {
 		return "", fmt.Errorf("leader gRPC address not available")
 	}
 
-	// If the address starts with ":", it's missing a host - use localhost
+	// Extract port from the address and use localhost
+	// Docker internal: "pyazdb-node1:9090" -> CLI external: "localhost:9090"
 	grpcAddr := leader.GRPCAddr
-	if len(grpcAddr) > 0 && grpcAddr[0] == ':' {
-		grpcAddr = "localhost" + grpcAddr
+	for i := 0; i < len(grpcAddr); i++ {
+		if grpcAddr[i] == ':' {
+			grpcAddr = "localhost" + grpcAddr[i:]
+			break
+		}
 	}
 
 	return grpcAddr, nil

@@ -14,6 +14,7 @@ services:
       - MANDI_ADDR=:7000
     networks:
       - pyazdb-network
+  
   node1:
     build:
       context: .
@@ -39,6 +40,58 @@ services:
       - mandi
     networks:
       - pyazdb-network
+  
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile.kv-single
+    image: pyazdb:latest
+    container_name: pyazdb-node2
+    command: kv-single
+    ports:
+      - "8081:8081"
+      - "9091:9091"
+      - "12001:12001"
+    environment:
+      - NODE_ID=node2
+      - RAFT_ADDR=pyazdb-node2:12001
+      - RAFT_DATA=/data/node2
+      - RAFT_LEADER=false
+      - GRPC_ADDR=:9091
+      - HTTP_ADDR=:8081
+      - MANDI_ADDR=http://pyazdb-mandi:7000
+    volumes:
+      - node2-data:/data
+    depends_on:
+      - mandi
+    networks:
+      - pyazdb-network
+  
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile.kv-single
+    image: pyazdb:latest
+    container_name: pyazdb-node3
+    command: kv-single
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+      - "12002:12002"
+    environment:
+      - NODE_ID=node3
+      - RAFT_ADDR=pyazdb-node3:12002
+      - RAFT_DATA=/data/node3
+      - RAFT_LEADER=false
+      - GRPC_ADDR=:9092
+      - HTTP_ADDR=:8082
+      - MANDI_ADDR=http://pyazdb-mandi:7000
+    volumes:
+      - node3-data:/data
+    depends_on:
+      - mandi
+    networks:
+      - pyazdb-network
 
 networks:
   pyazdb-network:
@@ -47,3 +100,5 @@ networks:
 
 volumes:
   node1-data:
+  node2-data:
+  node3-data:

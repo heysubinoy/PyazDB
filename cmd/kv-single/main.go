@@ -86,11 +86,33 @@ func setupRaft(mem *store.MemStore, nodeID, bindAddr, dataDir string, bootstrap 
 /* ---------------- Discovery Helpers ---------------- */
 
 func registerLeader(mandi, nodeID, addr, httpAddr, grpcAddr string, r *raft.Raft) error {
+	// Extract hostname from raft addr (e.g., "pyazdb-node1:12000" -> "pyazdb-node1")
+	hostname := "localhost"
+	if idx := len(addr) - 1; idx >= 0 {
+		for i := 0; i < len(addr); i++ {
+			if addr[i] == ':' {
+				hostname = addr[:i]
+				break
+			}
+		}
+	}
+
+	// Prepend hostname to HTTP and gRPC addresses if they start with ":"
+	fullHTTPAddr := httpAddr
+	if len(httpAddr) > 0 && httpAddr[0] == ':' {
+		fullHTTPAddr = hostname + httpAddr
+	}
+
+	fullGRPCAddr := grpcAddr
+	if len(grpcAddr) > 0 && grpcAddr[0] == ':' {
+		fullGRPCAddr = hostname + grpcAddr
+	}
+
 	info := LeaderInfo{
 		ID:        nodeID,
 		Addr:      addr,
-		HTTPAddr:  httpAddr,
-		GRPCAddr:  grpcAddr,
+		HTTPAddr:  fullHTTPAddr,
+		GRPCAddr:  fullGRPCAddr,
 		Term:      r.CurrentTerm(),
 		UpdatedAt: time.Now(),
 	}
