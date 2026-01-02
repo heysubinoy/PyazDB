@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyazDB Benchmark Suite</title>
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">⚡</span>
+          <h1>PyazDB Benchmark</h1>
+        </div>
+        <div class="connection-status" id="connectionStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Disconnected</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Configuration Panel -->
+      <section class="config-panel glass-card">
+        <h2>Configuration</h2>
+        <div class="config-grid">
+          <div class="config-item">
+            <label for="endpoint">Leader Endpoint</label>
+            <input type="text" id="endpoint" value="http://localhost:8080" placeholder="http://localhost:8080">
+          </div>
+          <div class="config-item">
+            <label for="operations">Operations per Test</label>
+            <input type="number" id="operations" value="100" min="1" max="10000">
+          </div>
+          <div class="config-item">
+            <label for="concurrency">Concurrency</label>
+            <input type="number" id="concurrency" value="10" min="1" max="100">
+          </div>
+          <div class="config-item">
+            <label for="keySize">Key Size (bytes)</label>
+            <input type="number" id="keySize" value="16" min="1" max="256">
+          </div>
+          <div class="config-item">
+            <label for="valueSize">Value Size (bytes)</label>
+            <input type="number" id="valueSize" value="128" min="1" max="10240">
+          </div>
+          <div class="config-item">
+            <label for="targetTps">Target TPS (0 = unlimited)</label>
+            <input type="number" id="targetTps" value="0" min="0" max="100000" placeholder="0 = no limit">
+          </div>
+        </div>
+        <div class="config-actions">
+          <button class="btn btn-primary" id="runBenchmark">
+            <span class="btn-icon">▶</span>
+            Run Benchmark
+          </button>
+          <button class="btn btn-secondary" id="stopBenchmark" disabled>
+            <span class="btn-icon">⏹</span>
+            Stop
+          </button>
+          <button class="btn btn-outline" id="clearResults">
+            <span class="btn-icon">🗑</span>
+            Clear Results
+          </button>
+        </div>
+      </section>
+
+      <!-- Progress Bar -->
+      <section class="progress-section glass-card" id="progressSection" style="display: none;">
+        <div class="progress-header">
+          <span id="progressText">Running benchmark...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </section>
+
+      <!-- Live Stats -->
+      <section class="stats-grid">
+        <div class="stat-card glass-card">
+          <div class="stat-icon put">📥</div>
+          <div class="stat-info">
+            <span class="stat-label">PUT Operations</span>
+            <span class="stat-value" id="putCount">0</span>
+            <span class="stat-sub">Success: <span id="putSuccess">0%</span></span>
+          </div>
+        </div>
+        <div class="stat-card glass-card">
+          <div class="stat-icon get">📤</div>
+          <div class="stat-info">
+            <span class="stat-label">GET Operations</span>
+            <span class="stat-value" id="getCount">0</span>
+            <span class="stat-sub">Success: <span id="getSuccess">0%</span></span>
+          </div>
+        </div>
+        <div class="stat-card glass-card">
+          <div class="stat-icon delete">🗑️</div>
+          <div class="stat-info">
+            <span class="stat-label">DELETE Operations</span>
+            <span class="stat-value" id="deleteCount">0</span>
+            <span class="stat-sub">Success: <span id="deleteSuccess">0%</span></span>
+          </div>
+        </div>
+        <div class="stat-card glass-card">
+          <div class="stat-icon latency">⏱️</div>
+          <div class="stat-info">
+            <span class="stat-label">Avg Latency</span>
+            <span class="stat-value" id="avgLatency">0 ms</span>
+            <span class="stat-sub">Throughput: <span id="throughput">0</span> ops/s</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts Section -->
+      <section class="charts-section">
+        <div class="chart-container glass-card">
+          <h3>Latency Over Time</h3>
+          <canvas id="latencyChart"></canvas>
+        </div>
+        <div class="chart-container glass-card">
+          <h3>Operation Success Rates</h3>
+          <canvas id="successChart"></canvas>
+        </div>
+        <div class="chart-container glass-card">
+          <h3>Throughput Over Time</h3>
+          <canvas id="throughputChart"></canvas>
+        </div>
+        <div class="chart-container glass-card">
+          <h3>Latency Distribution</h3>
+          <canvas id="distributionChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Results Table -->
+      <section class="results-section glass-card">
+        <h3>Detailed Results</h3>
+        <div class="table-wrapper">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Operation</th>
+                <th>Total</th>
+                <th>Success</th>
+                <th>Failed</th>
+                <th>Avg Latency</th>
+                <th>Min Latency</th>
+                <th>Max Latency</th>
+                <th>P95 Latency</th>
+                <th>P99 Latency</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr>
+                <td colspan="9" class="empty-state">Run a benchmark to see results</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Log Section -->
+      <section class="log-section glass-card">
+        <div class="log-header">
+          <h3>Activity Log</h3>
+          <button class="btn btn-sm btn-outline" id="clearLog">Clear</button>
+        </div>
+        <div class="log-container" id="logContainer">
+          <div class="log-entry info">Welcome to PyazDB Benchmark Suite. Configure your settings and run a benchmark.</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>PyazDB Benchmark Suite v1.0 | Built with ❤️ for distributed systems</p>
+    </footer>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

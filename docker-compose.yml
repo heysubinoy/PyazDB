@@ -14,29 +14,6 @@ services:
       - MANDI_ADDR=:7000
     networks:
       - pyazdb-network
-
-  sarpanch:
-    build:
-      context: .
-      dockerfile: Dockerfile.sarpanch
-    image: pyazdb-sarpanch:latest
-    container_name: pyazdb-sarpanch
-    command: sarpanch
-    ports:
-      - "8000:8000"
-    environment:
-      - PYAZDB_IMAGE=pyazdb:latest
-      - PYAZDB_NETWORK=pyazdb-network
-      - MANDI_ADDR=http://pyazdb-mandi:7000
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - mandi
-    networks:
-      - pyazdb-network
-    stdin_open: true
-    tty: true
-
   node1:
     build:
       context: .
