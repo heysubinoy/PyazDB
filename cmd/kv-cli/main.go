@@ -48,7 +48,13 @@ func getLeaderGRPCAddr(mandiAddr string) (string, error) {
 		return "", fmt.Errorf("leader gRPC address not available")
 	}
 
-	return leader.GRPCAddr, nil
+	// If the address starts with ":", it's missing a host - use localhost
+	grpcAddr := leader.GRPCAddr
+	if len(grpcAddr) > 0 && grpcAddr[0] == ':' {
+		grpcAddr = "localhost" + grpcAddr
+	}
+
+	return grpcAddr, nil
 }
 
 func main() {
@@ -71,8 +77,8 @@ func main() {
 
 	fmt.Printf("Connecting to leader at %s\n", leaderAddr)
 
-	// Connect to gRPC server
-	conn, err := grpc.NewClient(leaderAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Connect to gRPC server using passthrough resolver for direct address connection
+	conn, err := grpc.NewClient("passthrough:///"+leaderAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
