@@ -2,7 +2,7 @@
 
 **PyazDB** is a distributed key-value database built in Go, featuring Raft consensus for data replication and fault tolerance. It provides both HTTP and gRPC APIs for interacting with the database.
 
-## 🌟 Features
+## Features
 
 - **Distributed Architecture**: Multi-node cluster with automatic leader election
 - **Raft Consensus**: Strong consistency using HashiCorp Raft implementation
@@ -11,7 +11,7 @@
 - **Automatic Failover**: Leader forwarding ensures requests reach the correct node
 - **Persistent Storage**: BoltDB-backed Raft log and stable storage
 
-## 🏗️ Architecture
+## Architecture
 
 PyazDB consists of the following services:
 
@@ -37,7 +37,7 @@ PyazDB consists of the following services:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🔧 Services
+## Services
 
 ### KV-Single (Database Node)
 
@@ -108,7 +108,7 @@ kv-cli delete <key>
 |----------|-------------|---------|
 | `MANDI_ADDR` | Mandi discovery service address | `http://127.0.0.1:7000` |
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -168,7 +168,7 @@ MANDI_ADDR=http://127.0.0.1:7000 \
 ./bin/kv-single
 ```
 
-## 📡 API Reference
+## API Reference
 
 ### HTTP API
 
@@ -212,7 +212,7 @@ export MANDI_ADDR=http://127.0.0.1:7000
 ./bin/kv-cli delete hello
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 PyazDB/
@@ -233,7 +233,7 @@ PyazDB/
 └── Dockerfile.mandi     # Dockerfile for discovery service
 ```
 
-## 🔄 How Raft Consensus Works in PyazDB
+## How Raft Consensus Works in PyazDB
 
 1. **Leader Election**: When the cluster starts, nodes elect a leader using Raft
 2. **Write Path**: All writes go through the leader, which replicates to followers
